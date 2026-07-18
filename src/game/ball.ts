@@ -73,7 +73,7 @@ export class Ball {
     this.mesh = new THREE.Group();
     const core = new THREE.Mesh(
       new THREE.SphereGeometry(this.radius, 32, 24),
-      new THREE.MeshStandardMaterial({ color: '#f4f7f5', roughness: 0.35, metalness: 0.55 }),
+      new THREE.MeshStandardMaterial({ color: '#ccd5cf', roughness: 0.5, metalness: 0.18 }),
     );
     core.castShadow = true;
     this.shell = new THREE.Mesh(
@@ -81,9 +81,9 @@ export class Ball {
       new THREE.MeshStandardMaterial({
         color: '#000000',
         emissive: new THREE.Color(color),
-        emissiveIntensity: 0.55,
+        emissiveIntensity: 0.85,
         transparent: true,
-        opacity: 0.28,
+        opacity: 0.35,
         roughness: 0.4,
       }),
     );

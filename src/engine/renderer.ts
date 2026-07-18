@@ -59,10 +59,10 @@ export class Stage {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.1, 900);
     this.camera.position.set(0, 6, 10);
 
-    this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x1a2420, 0.85);
+    this.hemi = new THREE.HemisphereLight(0xbfd8ff, 0x1a2420, 1.05);
     this.scene.add(this.hemi);
 
-    this.dirLight = new THREE.DirectionalLight(0xffffff, 1.6);
+    this.dirLight = new THREE.DirectionalLight(0xffffff, 1.9);
     this.dirLight.position.set(24, 48, 18);
     if (qs.shadows) {
       this.dirLight.castShadow = true;

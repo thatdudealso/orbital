@@ -90,23 +90,26 @@ export function buildDecorations(ctx: DecorCtx): void {
       break;
     }
     case 'city': {
-      const count = Math.floor(int(ctx.rng, 60, 90) * d);
+      const count = Math.floor(int(ctx.rng, 46, 64) * d);
       const geo = new THREE.BoxGeometry(1, 1, 1);
-      const mat = new THREE.MeshStandardMaterial({ color: '#0b0b18', roughness: 0.9 });
+      const mat = new THREE.MeshStandardMaterial({ color: '#12122a', roughness: 0.9 });
       const inst = new THREE.InstancedMesh(geo, mat, count);
       const winGeo = new THREE.BoxGeometry(1.02, 0.06, 1.02);
       const winMat = new THREE.MeshStandardMaterial({ color: '#000', emissive: new THREE.Color('#22d3ee'), emissiveIntensity: 0.9 });
       const winInst = new THREE.InstancedMesh(winGeo, winMat, count);
       const m = new THREE.Matrix4();
-      scatter(ctx, count, 90, 13).forEach((p, i) => {
-        const w = range(ctx.rng, 4, 10);
-        const h = range(ctx.rng, 10, 46);
+      // buildings sit far from the racing line and low, so they frame the
+      // track as a skyline instead of swallowing the camera
+      scatter(ctx, count, 100, 26).forEach((p, i) => {
+        const w = range(ctx.rng, 3.5, 8);
+        const h = range(ctx.rng, 8, 30);
         m.identity();
-        m.setPosition(p.x, floor + h / 2 - 8, p.z);
+        m.setPosition(p.x, floor + h / 2 - 14, p.z);
         m.scale(new THREE.Vector3(w, h, w));
         inst.setMatrixAt(i, m);
-        // lit band near the top
-        m.setPosition(p.x, floor + h - 8 - range(ctx.rng, 1, h * 0.4), p.z);
+        // lit band near the top (fresh matrix - never compound scales)
+        m.identity();
+        m.setPosition(p.x, floor + h - 14 - range(ctx.rng, 1, h * 0.4), p.z);
         m.scale(new THREE.Vector3(w, 1, w));
         winInst.setMatrixAt(i, m);
       });
@@ -148,20 +151,23 @@ export function buildDecorations(ctx: DecorCtx): void {
       break;
     }
     case 'peaks': {
-      const count = Math.floor(int(ctx.rng, 40, 60) * d);
+      const count = Math.floor(int(ctx.rng, 34, 48) * d);
       const geo = new THREE.ConeGeometry(1, 1, 6);
-      const mat = new THREE.MeshStandardMaterial({ color: '#39424c', roughness: 1 });
-      const snowMat = new THREE.MeshStandardMaterial({ color: '#dbe7ee', roughness: 0.9 });
+      const mat = new THREE.MeshStandardMaterial({ color: '#2e3742', roughness: 1 });
+      const snowMat = new THREE.MeshStandardMaterial({ color: '#c3d3de', roughness: 0.9 });
       const inst = new THREE.InstancedMesh(geo, mat, count);
       const snow = new THREE.InstancedMesh(geo, snowMat, count);
       const m = new THREE.Matrix4();
-      scatter(ctx, count, 110, 15).forEach((p, i) => {
-        const s = range(ctx.rng, 8, 26);
+      // peaks stay well clear of the racing line and sit low, so they read
+      // as a distant ridge instead of swallowing the camera
+      scatter(ctx, count, 130, 34).forEach((p, i) => {
+        const s = range(ctx.rng, 7, 20);
         m.identity();
-        m.setPosition(p.x, floor + s * 0.28 - 6, p.z);
+        m.setPosition(p.x, floor + s * 0.22 - 10, p.z);
         m.scale(new THREE.Vector3(s, s * 0.9, s));
         inst.setMatrixAt(i, m);
-        m.setPosition(p.x, floor + s * 0.62 - 6, p.z);
+        m.identity(); // reset before the snow cap - never compound scales
+        m.setPosition(p.x, floor + s * 0.56 - 10, p.z);
         m.scale(new THREE.Vector3(s * 0.36, s * 0.35, s * 0.36));
         snow.setMatrixAt(i, m);
       });
