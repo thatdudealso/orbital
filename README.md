@@ -68,7 +68,6 @@ src/            The game module (mirrors frontend/app/orbital in 5432wire)
   game/         biomes, levels, segments, obstacles, track, generator, save
   ui/           HUD, briefing, menus, level select, edge controls
 routes/         React Router 7 route files (lobby + game host)
-skills/         Agent skills: orbital-add-level, orbital-playtest
 ```
 
 ## Architecture
@@ -87,7 +86,7 @@ No dedicated game infrastructure: the game rides the existing frontend build and
 
 ## Development
 
-The game lives and runs inside the 5432wire monorepo - see the [5432wire repo](https://github.com/thatdudealso/5432wire) for the full stack. Agent-facing skills in `skills/` document how to add levels/biomes and how to playtest in a real browser.
+The game lives and runs inside the 5432wire monorepo - see the [5432wire repo](https://github.com/thatdudealso/5432wire) for the full stack.
 
 ```bash
 cd frontend && npm install && npm run dev
