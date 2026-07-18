@@ -107,8 +107,7 @@ export function buildDecorations(ctx: DecorCtx): void {
         m.setPosition(p.x, floor + h / 2 - 14, p.z);
         m.scale(new THREE.Vector3(w, h, w));
         inst.setMatrixAt(i, m);
-        // lit band near the top (fresh matrix - never compound scales)
-        m.identity();
+        // lit band near the top
         m.setPosition(p.x, floor + h - 14 - range(ctx.rng, 1, h * 0.4), p.z);
         m.scale(new THREE.Vector3(w, 1, w));
         winInst.setMatrixAt(i, m);
@@ -151,23 +150,20 @@ export function buildDecorations(ctx: DecorCtx): void {
       break;
     }
     case 'peaks': {
-      const count = Math.floor(int(ctx.rng, 34, 48) * d);
+      const count = Math.floor(int(ctx.rng, 40, 60) * d);
       const geo = new THREE.ConeGeometry(1, 1, 6);
-      const mat = new THREE.MeshStandardMaterial({ color: '#2e3742', roughness: 1 });
-      const snowMat = new THREE.MeshStandardMaterial({ color: '#c3d3de', roughness: 0.9 });
+      const mat = new THREE.MeshStandardMaterial({ color: '#39424c', roughness: 1 });
+      const snowMat = new THREE.MeshStandardMaterial({ color: '#dbe7ee', roughness: 0.9 });
       const inst = new THREE.InstancedMesh(geo, mat, count);
       const snow = new THREE.InstancedMesh(geo, snowMat, count);
       const m = new THREE.Matrix4();
-      // peaks stay well clear of the racing line and sit low, so they read
-      // as a distant ridge instead of swallowing the camera
-      scatter(ctx, count, 130, 34).forEach((p, i) => {
-        const s = range(ctx.rng, 7, 20);
+      scatter(ctx, count, 110, 15).forEach((p, i) => {
+        const s = range(ctx.rng, 8, 26);
         m.identity();
-        m.setPosition(p.x, floor + s * 0.22 - 10, p.z);
+        m.setPosition(p.x, floor + s * 0.28 - 6, p.z);
         m.scale(new THREE.Vector3(s, s * 0.9, s));
         inst.setMatrixAt(i, m);
-        m.identity(); // reset before the snow cap - never compound scales
-        m.setPosition(p.x, floor + s * 0.56 - 10, p.z);
+        m.setPosition(p.x, floor + s * 0.62 - 6, p.z);
         m.scale(new THREE.Vector3(s * 0.36, s * 0.35, s * 0.36));
         snow.setMatrixAt(i, m);
       });

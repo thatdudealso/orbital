@@ -186,7 +186,6 @@ export class Game {
     this.ball = new Ball(this.physics.world, this.track.startPos, this.biome.physics, this.biome.ballColor);
     scene.add(this.ball.mesh);
     this.respawnPos.copy(this.track.startPos);
-    this.rig.setWorld(this.physics.world, this.ball.collider);
 
     // input wiring
     this.input.attach();

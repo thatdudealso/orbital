@@ -136,7 +136,7 @@ export const BIOMES: Record<string, BiomeDef> = {
     briefing:
       'Thin air on a broken ridgeline. Gravity runs a touch light, the ice sheets run frictionless, and the old tiles crumble under the ball.',
     gravityNote: 'GRAVITY: 8.6 m/s² - THIN AIR + ICE',
-    sky: { top: '#12203a', bottom: '#04080f', fogColor: '#0f1c2e', fogDensity: 0.014 },
+    sky: { top: '#1b2430', bottom: '#080d13', fogColor: '#16202b', fogDensity: 0.017 },
     palette: {
       track: '#39434d',
       trackSide: '#232b33',
