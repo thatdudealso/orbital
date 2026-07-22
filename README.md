@@ -32,7 +32,7 @@ It ships as a route inside the [5432wire](https://github.com/thatdudealso/5432wi
 | 01 | **GRID ZERO** | 9.8 | Baseline Earth. Tutorial construct. |
 | 02 | **DUNE SEA** | 9.8 | Sand drag kills momentum; wind shoves sideways. |
 | 03 | **NEON CITY** | 9.8 | Rooftop gaps, traffic platforms, piston billboards. |
-| 04 | **TIDE BREAK** | 7.8 | Floaty arcs; water drag pools; bobbing pontoons. |
+| 04 | **TIDE BREAK** | 7.8 | Floaty arcs; water drag pools kill momentum; geysers launch you mid-air. |
 | 05 | **SUMMIT PASS** | 8.6 | Thin air, ice sheets, crumbling tiles. |
 | 06 | **VOID STATION** | 3.2 | LOW-G. Mega jumps, inertia is king. |
 | 07 | **MAGMA RIFT** | 9.8 | Lava kills. Geysers launch you. Basalt collapses. |
@@ -92,6 +92,10 @@ The game lives and runs inside the 5432wire monorepo - see the [5432wire repo](h
 cd frontend && npm install && npm run dev
 # http://localhost:3000/orbital
 ```
+
+## Contributing
+
+Bug reports, level ideas, and PRs are welcome. This repo is a source mirror (no build/test tooling lives here) - see [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, how to verify a change, code style, and the PR process.
 
 ---
 
