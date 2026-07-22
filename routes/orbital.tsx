@@ -20,8 +20,8 @@ import '../orbital/orbital.css';
 
 export function meta() {
   return [
-    { title: 'ORBITAL - one ball, ten worlds, no mercy | 5432Wire' },
-    { name: 'description', content: 'A neon physics runner across ten worlds with shifting gravity. Roll, jump, survive.' },
+    { title: 'ORBITAL - one ball, twenty worlds, no mercy | 5432Wire' },
+    { name: 'description', content: 'A neon physics runner across twenty worlds with shifting gravity. Act I teaches. Act II does not forgive.' },
   ];
 }
 
@@ -44,7 +44,7 @@ export default function OrbitalLobby() {
       <Navbar />
       <div className="orb-hero">
         <h1 className="orb-wordmark">ORBITAL</h1>
-        <div className="orb-tagline">one ball <b>·</b> ten worlds <b>·</b> no mercy</div>
+        <div className="orb-tagline">one ball <b>·</b> twenty worlds <b>·</b> no mercy</div>
         {isLoading ? null : isAuthenticated ? (
           <div className="orb-mode-row">
             <Link className="orb-btn violet" to="/orbital/play?mode=random">
@@ -62,7 +62,7 @@ export default function OrbitalLobby() {
       {isAuthenticated && (
         <>
           <div className="orb-section">
-            <h2 className="orb-section-title">$ campaign <span className="p">// {completedCount}/10 worlds cleared{user?.username ? ` · pilot: ${user.username}` : ''}</span></h2>
+            <h2 className="orb-section-title">$ campaign <span className="p">// {completedCount}/20 worlds cleared{user?.username ? ` · pilot: ${user.username.split('@')[0]}` : ''}</span></h2>
             <LevelSelect progress={progress} onPlay={(i) => navigate(`/orbital/play?level=${i}`)} />
           </div>
 
@@ -91,7 +91,8 @@ export default function OrbitalLobby() {
           <b>JUMP</b> - <span className="k">SPACE</span> on desktop, <span className="k">tap anywhere</span> on mobile.<br />
           <b>SPEED</b> - the longer you hold, the faster you roll. Release to coast, pull back to brake.<br />
           <b>SURVIVE</b> - gravity changes per world. Checkpoints save you, but the timer never stops.
-          Grab <span className="k">power-ups</span>, dodge hazards, chase par.
+          Grab <span className="k">power-ups</span> (boost, shield, phase, dash, echo…), dodge hazards, chase par.
+          <br /><b>ACT II</b> - worlds 11-20 are longer and meaner: gates, crushers, portals, conveyors. Finish Act I first.
         </div>
       </div>
     </div>
