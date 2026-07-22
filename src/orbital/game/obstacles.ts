@@ -569,6 +569,323 @@ export function markCheckpointActivated(ctx: BuildCtx, index: number): void {
   });
 }
 
+// ---------------------------------------------------------------- conveyor belt (forward shove)
+
+export function addConveyor(
+  ctx: BuildCtx,
+  center: THREE.Vector3,
+  size: THREE.Vector3,
+  heading: number,
+  strength = 18,
+): void {
+  const quat = trackQuat(heading);
+  const dir = new THREE.Vector3(-Math.sin(heading), 0, -Math.cos(heading));
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(size.x, 0.18, size.z), ctx.mats.accent);
+  deck.position.copy(center);
+  deck.quaternion.copy(quat);
+  ctx.scene.add(deck);
+
+  // chevron arrows
+  for (let i = 0; i < 3; i++) {
+    const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 3), ctx.mats.edge);
+    arrow.rotation.x = -Math.PI / 2;
+    const local = new THREE.Vector3(0, 0.2, (i - 1) * (size.z / 4));
+    local.applyQuaternion(quat);
+    arrow.position.copy(center).add(local);
+    arrow.quaternion.copy(quat);
+    arrow.rotateX(-Math.PI / 2);
+    ctx.scene.add(arrow);
+  }
+
+  addZoneVolume(
+    ctx,
+    center.clone().add(new THREE.Vector3(0, 1.1, 0)),
+    new THREE.Vector3(size.x, 2.2, size.z),
+    heading,
+    { kind: 'conveyor', value: strength, dir },
+    'wind',
+  );
+
+  ctx.updatables.push({
+    update(_dt, t) {
+      (deck.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.4 + Math.sin(t * 8) * 0.5;
+    },
+  });
+}
+
+// ---------------------------------------------------------------- oscillating gate doors
+
+export function addGate(
+  ctx: BuildCtx,
+  center: THREE.Vector3,
+  width: number,
+  heading: number,
+  opts: { period?: number; opening?: number; phase?: number } = {},
+): void {
+  const period = opts.period ?? 2.8;
+  const opening = opts.opening ?? 1.6;
+  const phase = opts.phase ?? ctx.rng() * period;
+  const quat = trackQuat(heading);
+  const right = new THREE.Vector3(Math.cos(heading), 0, Math.sin(heading));
+  const doorW = (width - opening) / 2;
+  const doorH = 2.4;
+  const doorD = 0.35;
+
+  const makeDoor = (side: 1 | -1) => {
+    const body = ctx.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(center.x, center.y + doorH / 2, center.z),
+    );
+    ctx.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(doorW / 2, doorH / 2, doorD / 2)
+        .setFriction(0.2)
+        .setCollisionGroups(staticGroups),
+      body,
+    );
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(doorW, doorH, doorD), ctx.mats.hazard);
+    mesh.castShadow = true;
+    ctx.scene.add(mesh);
+    return { body, mesh, side };
+  };
+
+  const left = makeDoor(-1);
+  const rightDoor = makeDoor(1);
+  const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.3, doorH + 0.4, 0.5), ctx.mats.trackSide);
+  const frameR = frameL.clone();
+  frameL.position.copy(center).addScaledVector(right, width / 2).add(new THREE.Vector3(0, doorH / 2, 0));
+  frameR.position.copy(center).addScaledVector(right, -width / 2).add(new THREE.Vector3(0, doorH / 2, 0));
+  ctx.scene.add(frameL, frameR);
+
+  ctx.updatables.push({
+    update(_dt, t) {
+      // open half the cycle, slam shut the other half
+      const cyc = ((t + phase) % period) / period;
+      let openK: number;
+      if (cyc < 0.45) openK = 1;
+      else if (cyc < 0.55) openK = 1 - (cyc - 0.45) / 0.1;
+      else if (cyc < 0.9) openK = 0;
+      else openK = (cyc - 0.9) / 0.1;
+      const closedHalf = 0.15;
+      const gap = closedHalf + openK * (opening / 2 - closedHalf);
+      for (const d of [left, rightDoor]) {
+        const p = center
+          .clone()
+          .addScaledVector(right, d.side * (gap + doorW / 2))
+          .add(new THREE.Vector3(0, doorH / 2, 0));
+        d.body.setNextKinematicTranslation({ x: p.x, y: p.y, z: p.z });
+        d.body.setNextKinematicRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+        d.mesh.position.copy(p);
+        d.mesh.quaternion.copy(quat);
+      }
+    },
+  });
+}
+
+// ---------------------------------------------------------------- seesaw / tilting deck
+
+export function addSeesaw(
+  ctx: BuildCtx,
+  center: THREE.Vector3,
+  heading: number,
+  opts: { length?: number; width?: number; amp?: number; speed?: number; phase?: number } = {},
+): void {
+  const length = opts.length ?? 8;
+  const width = opts.width ?? 4.5;
+  const amp = opts.amp ?? 0.35;
+  const speed = opts.speed ?? 0.7;
+  const phase = opts.phase ?? ctx.rng() * Math.PI * 2;
+  const thickness = 0.45;
+
+  const body = ctx.world.createRigidBody(
+    RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(center.x, center.y, center.z),
+  );
+  ctx.world.createCollider(
+    RAPIER.ColliderDesc.cuboid(width / 2, thickness / 2, length / 2)
+      .setFriction(ctx.biome.physics.trackFriction)
+      .setCollisionGroups(staticGroups),
+    body,
+  );
+
+  const group = new THREE.Group();
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(width, thickness, length), ctx.mats.track);
+  deck.castShadow = true;
+  deck.receiveShadow = true;
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(width * 0.98, 0.08, length * 0.98), ctx.mats.edge);
+  edge.position.y = thickness / 2 + 0.04;
+  const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, width * 0.9, 10), ctx.mats.trackSide);
+  pivot.rotation.z = Math.PI / 2;
+  pivot.position.y = -0.5;
+  group.add(deck, edge, pivot);
+  ctx.scene.add(group);
+
+  ctx.updatables.push({
+    update(_dt, t) {
+      const pitch = Math.sin(t * speed + phase) * amp;
+      const quat = trackQuat(heading, pitch, 0);
+      body.setNextKinematicTranslation({ x: center.x, y: center.y, z: center.z });
+      body.setNextKinematicRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+      group.position.copy(center);
+      group.quaternion.copy(quat);
+    },
+  });
+}
+
+// ---------------------------------------------------------------- spinning ring gate (pass through)
+
+export function addRingGate(
+  ctx: BuildCtx,
+  center: THREE.Vector3,
+  heading: number,
+  opts: { radius?: number; speed?: number; phase?: number } = {},
+): void {
+  const radius = opts.radius ?? 2.2;
+  const speed = opts.speed ?? 1.4;
+  const phase = opts.phase ?? ctx.rng() * Math.PI * 2;
+  const quat = trackQuat(heading);
+
+  const group = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.18, 10, 36), ctx.mats.hazard);
+  // bar blocks half the aperture so you must time the gap
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(radius * 1.7, 0.28, 0.28), ctx.mats.hazard);
+  group.add(ring, bar);
+  group.position.copy(center);
+  group.quaternion.copy(quat);
+  ctx.scene.add(group);
+
+  const body = ctx.world.createRigidBody(
+    RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(center.x, center.y, center.z),
+  );
+  // approximate the spinning bar with a long cuboid
+  ctx.world.createCollider(
+    RAPIER.ColliderDesc.cuboid((radius * 1.7) / 2, 0.18, 0.18)
+      .setFriction(0.2)
+      .setCollisionGroups(staticGroups),
+    body,
+  );
+
+  ctx.updatables.push({
+    update(_dt, t) {
+      const spin = phase + t * speed;
+      const local = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), spin);
+      const worldQ = quat.clone().multiply(local);
+      body.setNextKinematicRotation({ x: worldQ.x, y: worldQ.y, z: worldQ.z, w: worldQ.w });
+      body.setNextKinematicTranslation({ x: center.x, y: center.y, z: center.z });
+      group.quaternion.copy(worldQ);
+    },
+  });
+}
+
+// ---------------------------------------------------------------- pulse crushers (side walls slam)
+
+export function addCrusher(
+  ctx: BuildCtx,
+  center: THREE.Vector3,
+  width: number,
+  heading: number,
+  opts: { period?: number; phase?: number; length?: number } = {},
+): void {
+  const period = opts.period ?? 2.2;
+  const phase = opts.phase ?? ctx.rng() * period;
+  const length = opts.length ?? 3.2;
+  const wallH = 2.2;
+  const wallT = 0.55;
+  const quat = trackQuat(heading);
+  const right = new THREE.Vector3(Math.cos(heading), 0, Math.sin(heading));
+
+  const makeWall = (side: 1 | -1) => {
+    const body = ctx.world.createRigidBody(
+      RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(center.x, center.y + wallH / 2, center.z),
+    );
+    ctx.world.createCollider(
+      RAPIER.ColliderDesc.cuboid(wallT / 2, wallH / 2, length / 2)
+        .setFriction(0.15)
+        .setCollisionGroups(staticGroups),
+      body,
+    );
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(wallT, wallH, length), ctx.mats.hazard);
+    mesh.castShadow = true;
+    ctx.scene.add(mesh);
+    return { body, mesh, side };
+  };
+
+  const a = makeWall(-1);
+  const b = makeWall(1);
+
+  // hazard sensor in the crush gap when closed
+  const sensor = ctx.world.createCollider(
+    RAPIER.ColliderDesc.cuboid(0.7, wallH / 2, length / 2)
+      .setTranslation(center.x, center.y + wallH / 2, center.z)
+      .setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w })
+      .setSensor(true)
+      .setCollisionGroups(sensorGroups)
+      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+  );
+  ctx.sensors.register(sensor, { type: 'hazard', kind: 'crusher' });
+
+  ctx.updatables.push({
+    update(_dt, t) {
+      const cyc = ((t + phase) % period) / period;
+      // open -> slam shut -> hold -> retract
+      let openK: number;
+      if (cyc < 0.35) openK = 1;
+      else if (cyc < 0.45) openK = 1 - (cyc - 0.35) / 0.1;
+      else if (cyc < 0.7) openK = 0;
+      else openK = (cyc - 0.7) / 0.3;
+      const gap = 0.55 + openK * (width / 2 - 0.4);
+      sensor.setEnabled(openK < 0.15);
+      for (const w of [a, b]) {
+        const p = center
+          .clone()
+          .addScaledVector(right, w.side * gap)
+          .add(new THREE.Vector3(0, wallH / 2, 0));
+        w.body.setNextKinematicTranslation({ x: p.x, y: p.y, z: p.z });
+        w.body.setNextKinematicRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+        w.mesh.position.copy(p);
+        w.mesh.quaternion.copy(quat);
+      }
+    },
+  });
+}
+
+// ---------------------------------------------------------------- portal pair (teleport A -> B)
+
+export function addPortalPair(
+  ctx: BuildCtx,
+  entry: THREE.Vector3,
+  exit: THREE.Vector3,
+  heading: number,
+): void {
+  const makePortal = (pos: THREE.Vector3, colorMat: THREE.MeshStandardMaterial, isEntry: boolean) => {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.12, 10, 28), colorMat);
+    ring.position.copy(pos).add(new THREE.Vector3(0, 1.4, 0));
+    ring.quaternion.copy(trackQuat(heading));
+    ctx.scene.add(ring);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.15, 0.18, 20), colorMat);
+    pad.position.copy(pos).add(new THREE.Vector3(0, 0.1, 0));
+    ctx.scene.add(pad);
+    ctx.updatables.push({
+      update(_dt, t) {
+        ring.rotation.z = t * (isEntry ? 1.6 : -1.6);
+        (ring.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.8 + Math.sin(t * 4) * 0.5;
+      },
+    });
+    return ring;
+  };
+
+  makePortal(entry, ctx.mats.power.phase, true);
+  makePortal(exit, ctx.mats.power.echo, false);
+
+  const exitPos = exit.clone().add(new THREE.Vector3(0, 1.4, 0));
+  const sensor = ctx.world.createCollider(
+    RAPIER.ColliderDesc.cylinder(1.0, 1.0)
+      .setTranslation(entry.x, entry.y + 1.2, entry.z)
+      .setSensor(true)
+      .setCollisionGroups(sensorGroups)
+      .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
+  );
+  ctx.sensors.register(sensor, { type: 'teleport', exit: exitPos, heading });
+}
+
 // ---------------------------------------------------------------- goal gate
 
 export function addGoalGate(ctx: BuildCtx, surface: THREE.Vector3, heading: number): THREE.Vector3 {

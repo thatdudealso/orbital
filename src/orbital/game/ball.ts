@@ -26,6 +26,9 @@ export const POWER_DURATIONS: Record<PowerupType, number> = {
   magnet: 10,
   slow: 6,
   anchor: 8,
+  phase: 5,
+  dash: 0.55,
+  echo: 9,
 };
 
 export class Ball {
@@ -50,6 +53,11 @@ export class Ball {
   magnetUntil = -1;
   slowUntil = -1;
   anchorUntil = -1;
+  phaseUntil = -1;
+  dashUntil = -1;
+  echoUntil = -1;
+  /** One-shot forward burst pending after dash pickup. */
+  private dashPending = false;
 
   constructor(world: RAPIER.World, pos: THREE.Vector3, tune: BallTuning, color: string) {
     this.baseDamping = tune.linearDamping;
@@ -105,6 +113,11 @@ export class Ball {
     else if (p === 'magnet') this.magnetUntil = now + dur;
     else if (p === 'slow') this.slowUntil = now + dur;
     else if (p === 'anchor') this.anchorUntil = now + dur;
+    else if (p === 'phase') this.phaseUntil = now + dur;
+    else if (p === 'dash') {
+      this.dashUntil = now + dur;
+      this.dashPending = true;
+    } else if (p === 'echo') this.echoUntil = now + dur;
   }
 
   consumeShield(): boolean {
@@ -118,6 +131,9 @@ export class Ball {
   isMagnetOn(now: number): boolean { return now < this.magnetUntil; }
   isSlowOn(now: number): boolean { return now < this.slowUntil; }
   isAnchorOn(now: number): boolean { return now < this.anchorUntil; }
+  isPhaseOn(now: number): boolean { return now < this.phaseUntil; }
+  isDashOn(now: number): boolean { return now < this.dashUntil; }
+  isEchoOn(now: number): boolean { return now < this.echoUntil; }
 
   activePowers(now: number): PowerupType[] {
     const out: PowerupType[] = [];
@@ -126,6 +142,9 @@ export class Ball {
     if (this.isMagnetOn(now)) out.push('magnet');
     if (this.isSlowOn(now)) out.push('slow');
     if (this.isAnchorOn(now)) out.push('anchor');
+    if (this.isPhaseOn(now)) out.push('phase');
+    if (this.isDashOn(now)) out.push('dash');
+    if (this.isEchoOn(now)) out.push('echo');
     return out;
   }
 
@@ -159,9 +178,37 @@ export class Ball {
     }
 
     const boosting = this.isBoosting(now);
-    const accel = tune.accel * (boosting ? 1.85 : 1) * (this.grounded ? 1 : 0.55);
+    const dashing = this.isDashOn(now);
+    const accel = tune.accel * (boosting ? 1.85 : 1) * (dashing ? 1.35 : 1) * (this.grounded ? 1 : 0.55);
     const mass = this.body.mass();
     this.body.applyImpulse({ x: mx * accel * mass * dt, y: 0, z: mz * accel * mass * dt }, true);
+
+    // dash: one-shot forward burst along camera look / velocity
+    if (this.dashPending) {
+      this.dashPending = false;
+      const v0 = this.body.linvel();
+      let dx = mx;
+      let dz = mz;
+      const dLen = Math.hypot(dx, dz);
+      if (dLen < 1e-3) {
+        const pLen = Math.hypot(v0.x, v0.z);
+        if (pLen > 0.4) {
+          dx = v0.x / pLen;
+          dz = v0.z / pLen;
+        } else {
+          dx = fx;
+          dz = fz;
+        }
+      } else {
+        dx /= dLen;
+        dz /= dLen;
+      }
+      const burst = tune.maxSpeed * 1.85;
+      this.body.setLinvel(
+        { x: dx * burst, y: Math.max(v0.y, 1.2), z: dz * burst },
+        true,
+      );
+    }
 
     // anchor power: extra downforce for low-g control
     if (this.isAnchorOn(now)) {
@@ -169,7 +216,7 @@ export class Ball {
     }
 
     // speed clamp (planar)
-    const maxSpeed = tune.maxSpeed * (boosting ? 1.6 : 1);
+    const maxSpeed = tune.maxSpeed * (boosting ? 1.6 : 1) * (dashing ? 1.95 : 1);
     const v = this.body.linvel();
     const planar = Math.hypot(v.x, v.z);
     if (planar > maxSpeed) {
@@ -177,9 +224,14 @@ export class Ball {
       this.body.setLinvel({ x: v.x * k, y: v.y, z: v.z * k }, true);
     }
 
-    // damping (drag zones add extra)
-    const damp = this.baseDamping + this.extraDamping;
-    this.body.setLinearDamping(damp);
+    // damping (drag zones add extra); phase slips slightly
+    const damp = this.baseDamping + this.extraDamping + (this.isPhaseOn(now) ? -0.08 : 0);
+    this.body.setLinearDamping(Math.max(0.02, damp));
+
+    // phase visual: translucent shell
+    const phased = this.isPhaseOn(now);
+    (this.shell.material as THREE.MeshStandardMaterial).opacity = phased ? 0.12 : 0.35;
+    (this.shell.material as THREE.MeshStandardMaterial).emissiveIntensity = phased ? 1.6 : 0.85;
 
     // jump: buffered + coyote
     if (input.jumpPressed) this.jumpBuffer = 0.13;

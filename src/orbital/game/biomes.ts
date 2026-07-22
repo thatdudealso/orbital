@@ -1,5 +1,5 @@
 /**
- * The ten worlds of ORBITAL. Each biome is a full identity:
+ * The twenty worlds of ORBITAL (Act I + Act II). Each biome is a full identity:
  * sky, palette, physics preset, decoration style, ambient behavior.
  */
 
@@ -17,7 +17,18 @@ export type DecorationKind =
   | 'magma'
   | 'glacier'
   | 'jungle'
-  | 'core';
+  | 'core'
+  // Act II
+  | 'mirror'
+  | 'storm'
+  | 'chrome'
+  | 'bloom'
+  | 'abyss'
+  | 'clock'
+  | 'prism'
+  | 'forge'
+  | 'signal'
+  | 'horizon';
 
 export interface BiomeDef {
   id: string;
@@ -136,7 +147,7 @@ export const BIOMES: Record<string, BiomeDef> = {
     briefing:
       'Thin air on a broken ridgeline. Gravity runs a touch light, the ice sheets run frictionless, and the old tiles crumble under the ball.',
     gravityNote: 'GRAVITY: 8.6 m/s² - THIN AIR + ICE',
-    sky: { top: '#1b2430', bottom: '#080d13', fogColor: '#16202b', fogDensity: 0.017 },
+    sky: { top: '#12203a', bottom: '#04080f', fogColor: '#0f1c2e', fogDensity: 0.014 },
     palette: {
       track: '#39434d',
       trackSide: '#232b33',
@@ -255,8 +266,252 @@ export const BIOMES: Record<string, BiomeDef> = {
     ballColor: '#f0abfc',
     fogNear: 55,
   },
+
+  // ------------------------------------------------------------------ ACT II
+
+  mirror_mere: {
+    id: 'mirror_mere',
+    name: 'MIRROR MERE',
+    tagline: 'reflected causeway',
+    briefing:
+      'A still black lake under twin moons. The deck is honest Earth gravity, but oscillating gates and spinning rings demand timing over brute speed. PHASE slips you through the worst of it.',
+    gravityNote: 'GRAVITY: 9.5 m/s² - TIMING TRIAL',
+    sky: { top: '#061018', bottom: '#02060c', fogColor: '#050e16', fogDensity: 0.013 },
+    palette: {
+      track: '#0f2430',
+      trackSide: '#0a1820',
+      edge: '#67e8f9',
+      accent: '#a5f3fc',
+      hazard: '#f472b6',
+      shard: '#e0f2fe',
+    },
+    physics: { ...basePhysics, gravity: 9.5, maxSpeed: 14.5, linearDamping: 0.22 },
+    decoration: 'mirror',
+    ballColor: '#67e8f9',
+    fogNear: 58,
+  },
+  storm_spire: {
+    id: 'storm_spire',
+    name: 'STORM SPIRE',
+    tagline: 'crosswind cathedral',
+    briefing:
+      'A needle tower punched through a living storm. Side winds never rest, conveyors hurl you forward, and the air is thick. Lean hard or get thrown into the void.',
+    gravityNote: 'GRAVITY: 10.4 m/s² - HEAVY AIR + WIND',
+    sky: { top: '#1a1030', bottom: '#080412', fogColor: '#140c24', fogDensity: 0.018 },
+    palette: {
+      track: '#2a1f45',
+      trackSide: '#1a1430',
+      edge: '#c084fc',
+      accent: '#818cf8',
+      hazard: '#f43f5e',
+      shard: '#e9d5ff',
+    },
+    physics: { ...basePhysics, gravity: 10.4, maxSpeed: 13.5, linearDamping: 0.38, jumpHeight: 1.95 },
+    decoration: 'storm',
+    ballColor: '#c084fc',
+    fogNear: 48,
+  },
+  chrome_yard: {
+    id: 'chrome_yard',
+    name: 'CHROME YARD',
+    tagline: 'industrial scrap rail',
+    briefing:
+      'Abandoned freight spines and slam-doors. Crushers pulse on a brutal clock; seesaws dump the careless. DASH punches you through closing gaps - miss the window and you are scrap.',
+    gravityNote: 'GRAVITY: 9.8 m/s² - MACHINERY KILLS',
+    sky: { top: '#1c1410', bottom: '#0a0806', fogColor: '#16100c', fogDensity: 0.016 },
+    palette: {
+      track: '#3a322c',
+      trackSide: '#241e1a',
+      edge: '#fb923c',
+      accent: '#fbbf24',
+      hazard: '#ef4444',
+      shard: '#fed7aa',
+    },
+    physics: { ...basePhysics, gravity: 9.8, maxSpeed: 14.5, friction: 0.95 },
+    decoration: 'chrome',
+    ballColor: '#fb923c',
+    fogNear: 52,
+  },
+  glass_bloom: {
+    id: 'glass_bloom',
+    name: 'GLASS BLOOM',
+    tagline: 'crystal greenhouse',
+    briefing:
+      'A shattered arboretum of light. Low friction glass runs, bounce pads rewrite arcs, and portal pairs skip the broken spans. ECHO pulls every shard within a wide radius - greed is optional, beauty is not.',
+    gravityNote: 'GRAVITY: 8.9 m/s² - LIGHT + SLICK',
+    sky: { top: '#102018', bottom: '#040c08', fogColor: '#0c1812', fogDensity: 0.014 },
+    palette: {
+      track: '#1a3a32',
+      trackSide: '#102820',
+      edge: '#2dd4bf',
+      accent: '#a3e635',
+      hazard: '#f43f5e',
+      shard: '#99f6e4',
+    },
+    physics: {
+      ...basePhysics,
+      gravity: 8.9,
+      trackFriction: 0.28,
+      friction: 0.4,
+      linearDamping: 0.1,
+      maxSpeed: 15,
+      jumpHeight: 2.25,
+    },
+    decoration: 'bloom',
+    ballColor: '#2dd4bf',
+    fogNear: 55,
+  },
+  silent_abyss: {
+    id: 'silent_abyss',
+    name: 'SILENT ABYSS',
+    tagline: 'pressure trench',
+    briefing:
+      'A trench so deep the light dies. Crush gravity pins you to the deck; drag pools swallow speed. Jump arcs are short and mean. ANCHOR is already the world - survive the crush.',
+    gravityNote: 'GRAVITY: 14.2 m/s² - CRUSH PRESSURE',
+    sky: { top: '#020816', bottom: '#000206', fogColor: '#020610', fogDensity: 0.022 },
+    palette: {
+      track: '#0c1a28',
+      trackSide: '#061018',
+      edge: '#38bdf8',
+      accent: '#6366f1',
+      hazard: '#e11d48',
+      shard: '#7dd3fc',
+    },
+    physics: {
+      ...basePhysics,
+      gravity: 14.2,
+      maxSpeed: 12.5,
+      jumpHeight: 1.55,
+      linearDamping: 0.42,
+      accel: 34,
+    },
+    decoration: 'abyss',
+    ballColor: '#38bdf8',
+    fogNear: 40,
+  },
+  clockwork_veil: {
+    id: 'clockwork_veil',
+    name: 'CLOCKWORK VEIL',
+    tagline: 'gear cathedral',
+    briefing:
+      'Brass gears the size of districts. Gates, rings, and crushers tick on interlocking rhythms. Memorize one cycle, then chain the openings. PHASE buys a mistake; rhythm buys the run.',
+    gravityNote: 'GRAVITY: 9.8 m/s² - TIMED MACHINERY',
+    sky: { top: '#1a1208', bottom: '#0a0703', fogColor: '#14100a', fogDensity: 0.015 },
+    palette: {
+      track: '#3d2e18',
+      trackSide: '#261c10',
+      edge: '#fbbf24',
+      accent: '#f59e0b',
+      hazard: '#dc2626',
+      shard: '#fde68a',
+    },
+    physics: { ...basePhysics, gravity: 9.8, maxSpeed: 14, linearDamping: 0.26 },
+    decoration: 'clock',
+    ballColor: '#fbbf24',
+    fogNear: 50,
+  },
+  prism_fall: {
+    id: 'prism_fall',
+    name: 'PRISM FALL',
+    tagline: 'shattered lightwell',
+    briefing:
+      'A vertical shaft of broken glass and soft gravity. Long hangs, wide gaps, portal warps across empty air. DASH and boost pads are the only honest bridges.',
+    gravityNote: 'GRAVITY: 5.4 m/s² - LONG HANG',
+    sky: { top: '#180828', bottom: '#060210', fogColor: '#12061e', fogDensity: 0.011 },
+    palette: {
+      track: '#2a1840',
+      trackSide: '#1a0e2a',
+      edge: '#e879f9',
+      accent: '#22d3ee',
+      hazard: '#fb7185',
+      shard: '#f5d0fe',
+    },
+    physics: {
+      ...basePhysics,
+      gravity: 5.4,
+      maxSpeed: 15.5,
+      jumpHeight: 2.8,
+      linearDamping: 0.08,
+      angularDamping: 1.1,
+    },
+    decoration: 'prism',
+    ballColor: '#e879f9',
+    fogNear: 70,
+  },
+  solar_forge: {
+    id: 'solar_forge',
+    name: 'SOLAR FORGE',
+    tagline: 'starheart foundry',
+    briefing:
+      'A foundry built inside a dying star. Lava strips, pulse crushers, and heat-haze drag. Conveyors feed the fire; SHIELD and PHASE are the only things between you and ash.',
+    gravityNote: 'GRAVITY: 11.2 m/s² - HEAT CRUSH',
+    sky: { top: '#2a0a00', bottom: '#100200', fogColor: '#220800', fogDensity: 0.019 },
+    palette: {
+      track: '#4a2010',
+      trackSide: '#2e1408',
+      edge: '#f97316',
+      accent: '#facc15',
+      hazard: '#ff1a00',
+      shard: '#fdba74',
+    },
+    physics: { ...basePhysics, gravity: 11.2, maxSpeed: 14, jumpHeight: 1.85, linearDamping: 0.3 },
+    decoration: 'forge',
+    ballColor: '#fb923c',
+    fogNear: 44,
+  },
+  null_signal: {
+    id: 'null_signal',
+    name: 'NULL SIGNAL',
+    tagline: 'dead broadcast array',
+    briefing:
+      'A derelict deep-space antenna farm. Near-void gravity, spinning ring gates, and laser fences. GRAV-ANCHOR, PHASE, and DASH are all on the table - pick wrong and you drift forever.',
+    gravityNote: 'GRAVITY: 2.6 m/s² - NEAR VOID',
+    sky: { top: '#04040e', bottom: '#000004', fogColor: '#060610', fogDensity: 0.007 },
+    palette: {
+      track: '#1a1a32',
+      trackSide: '#101022',
+      edge: '#818cf8',
+      accent: '#22d3ee',
+      hazard: '#f43f5e',
+      shard: '#c7d2fe',
+    },
+    physics: {
+      ...basePhysics,
+      gravity: 2.6,
+      maxSpeed: 16.5,
+      jumpHeight: 3.4,
+      linearDamping: 0.04,
+      angularDamping: 0.75,
+      friction: 0.7,
+    },
+    decoration: 'signal',
+    ballColor: '#818cf8',
+    fogNear: 95,
+  },
+  event_horizon: {
+    id: 'event_horizon',
+    name: 'EVENT HORIZON',
+    tagline: 'the last orbit',
+    briefing:
+      'The rim of a black hole. Gravity zones flip from feather to crush without warning. Portals, crushers, rings, conveyors - every tool, every threat. This is the end of the map.',
+    gravityNote: 'GRAVITY: 2.8 ⇄ 15 m/s² - HORIZON SHIFT',
+    sky: { top: '#0c0418', bottom: '#020008', fogColor: '#0a0314', fogDensity: 0.012 },
+    palette: {
+      track: '#221030',
+      trackSide: '#140820',
+      edge: '#f0abfc',
+      accent: '#22d3ee',
+      hazard: '#ef4444',
+      shard: '#fae8ff',
+    },
+    physics: { ...basePhysics, gravity: 9.8, maxSpeed: 15.5, jumpHeight: 2.2 },
+    decoration: 'horizon',
+    ballColor: '#f0abfc',
+    fogNear: 60,
+  },
 };
 
+/** Campaign unlock order: Act I (0-9) then Act II (10-19). */
 export const BIOME_ORDER = [
   'grid_zero',
   'dune_sea',
@@ -268,4 +523,14 @@ export const BIOME_ORDER = [
   'cryo_drift',
   'overgrowth',
   'the_core',
+  'mirror_mere',
+  'storm_spire',
+  'chrome_yard',
+  'glass_bloom',
+  'silent_abyss',
+  'clockwork_veil',
+  'prism_fall',
+  'solar_forge',
+  'null_signal',
+  'event_horizon',
 ] as const;
