@@ -137,7 +137,15 @@ export default function OrbitalPlay() {
         // default control mode for mobile: tilt (if permitted) else edges
         if (isMobile && settings.control === 'tilt') {
           const input = game.getInput();
-          void input.enableTilt().then((ok) => setMotionReady(ok));
+          void input.enableTilt().then((ok) => {
+            setMotionReady(ok);
+            if (!ok) {
+              const merged = { ...settings, control: 'edges' as const };
+              setSettings(merged);
+              saveSettings(merged);
+              input.setMode('arrows');
+            }
+          });
         } else if (isMobile) {
           game.getInput().setMode('arrows');
         }
@@ -196,7 +204,17 @@ export default function OrbitalPlay() {
     saveSettings(merged);
     const input = gameRef.current?.getInput();
     if (!input) return;
-    if (next === 'tilt') void input.enableTilt().then((ok) => setMotionReady(ok));
+    if (next === 'tilt') {
+      void input.enableTilt().then((ok) => {
+        setMotionReady(ok);
+        if (!ok) {
+          const merged = { ...settings, control: 'edges' as const };
+          setSettings(merged);
+          saveSettings(merged);
+          input.setMode('arrows');
+        }
+      });
+    }
     else {
       input.disableTilt();
       input.setMode('arrows');
