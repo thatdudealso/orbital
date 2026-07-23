@@ -9,7 +9,6 @@ export interface LevelRecord {
   bestTimeMs: number | null;
   deaths: number;
   shards: number;
-  attempts: number;
 }
 
 export interface ProgressState {
@@ -36,38 +35,15 @@ export function emptyProgress(): ProgressState {
   return { levels: {}, randomRun: { runs: 0, bestTimeMs: null } };
 }
 
-function normalizeLevelRecord(record?: Partial<LevelRecord>): LevelRecord {
-  return {
-    completed: record?.completed ?? false,
-    bestTimeMs: record?.bestTimeMs ?? null,
-    deaths: record?.deaths ?? 0,
-    shards: record?.shards ?? 0,
-    attempts: record?.attempts ?? 0,
-  };
-}
-
-function normalizeRandomRun(
-  randomRun?: { runs?: number; bestTimeMs?: number | null },
-): { runs: number; bestTimeMs: number | null } {
-  return {
-    runs: randomRun?.runs ?? 0,
-    bestTimeMs: randomRun?.bestTimeMs ?? null,
-  };
-}
-
 export function loadLocalProgress(): ProgressState {
   if (typeof localStorage === 'undefined') return emptyProgress();
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return emptyProgress();
     const parsed = JSON.parse(raw) as ProgressState;
-    const levels: Record<string, LevelRecord> = {};
-    for (const [id, record] of Object.entries(parsed.levels ?? {})) {
-      levels[id] = normalizeLevelRecord(record);
-    }
     return {
-      levels,
-      randomRun: normalizeRandomRun(parsed.randomRun),
+      levels: parsed.levels ?? {},
+      randomRun: parsed.randomRun ?? { runs: 0, bestTimeMs: null },
     };
   } catch {
     return emptyProgress();
@@ -104,20 +80,25 @@ export function saveSettings(s: DeviceSettings): void {
 
 // ------------------------------------------------------------- server sync
 
+// Fixed ahead of 5432wire prod: prod's current save.ts/api client no longer syncs
+// random-run stats to the server and pushes campaign completions without first
+// merging the latest remote record, so a stale local time can overwrite a better
+// server one. Both are restored here; the same fix is landing in 5432wire prod
+// separately - re-apply on the next sync from prod rather than dropping it.
 export interface GameApiLike {
-  getGameProgress(): Promise<{ success: boolean; data?: { levels: Record<string, Partial<LevelRecord>> } }>;
+  getGameProgress(): Promise<{ success: boolean; data?: { levels: Record<string, LevelRecord> } }>;
   getRandomRunStats(): Promise<{ success: boolean; data?: { runs: number; best_time_ms: number | null } }>;
   putGameProgress(
     levelId: string,
-    body: { completed?: boolean; best_time_ms?: number | null; deaths?: number; shards?: number; attempts?: number },
+    body: { completed?: boolean; best_time_ms?: number | null; deaths?: number; shards?: number },
   ): Promise<unknown>;
   putRandomRunStats(body: { runs: number; best_time_ms: number | null }): Promise<unknown>;
 }
 
 export function mergeRecord(local: LevelRecord | undefined, remote: LevelRecord | undefined): LevelRecord {
-  if (!local && !remote) return normalizeLevelRecord();
-  if (!local) return normalizeLevelRecord(remote);
-  if (!remote) return normalizeLevelRecord(local);
+  if (!local && !remote) return { completed: false, bestTimeMs: null, deaths: 0, shards: 0 };
+  if (!local) return remote!;
+  if (!remote) return local;
   return {
     completed: local.completed || remote.completed,
     bestTimeMs:
@@ -128,27 +109,25 @@ export function mergeRecord(local: LevelRecord | undefined, remote: LevelRecord 
           : Math.min(local.bestTimeMs, remote.bestTimeMs),
     deaths: Math.max(local.deaths, remote.deaths),
     shards: Math.max(local.shards, remote.shards),
-    attempts: Math.max(local.attempts, remote.attempts),
   };
 }
 
 export function mergeRandomRun(
-  local: { runs: number; bestTimeMs: number | null } | undefined,
-  remote: { runs: number; bestTimeMs: number | null } | undefined,
+  local: { runs: number; bestTimeMs: number | null },
+  remote: { runs: number; bestTimeMs: number | null },
 ): { runs: number; bestTimeMs: number | null } {
-  const normalizedLocal = normalizeRandomRun(local);
-  const normalizedRemote = normalizeRandomRun(remote);
   return {
-    runs: Math.max(normalizedLocal.runs, normalizedRemote.runs),
+    runs: Math.max(local.runs, remote.runs),
     bestTimeMs:
-      normalizedLocal.bestTimeMs == null
-        ? normalizedRemote.bestTimeMs
-        : normalizedRemote.bestTimeMs == null
-          ? normalizedLocal.bestTimeMs
-          : Math.min(normalizedLocal.bestTimeMs, normalizedRemote.bestTimeMs),
+      local.bestTimeMs == null
+        ? remote.bestTimeMs
+        : remote.bestTimeMs == null
+          ? local.bestTimeMs
+          : Math.min(local.bestTimeMs, remote.bestTimeMs),
   };
 }
 
+/** Merge a full local + remote progress snapshot (levels and random-run). */
 export function mergeProgress(local: ProgressState, remote: ProgressState): ProgressState {
   const merged = emptyProgress();
   merged.randomRun = mergeRandomRun(local.randomRun, remote.randomRun);
@@ -160,53 +139,22 @@ export function mergeProgress(local: ProgressState, remote: ProgressState): Prog
   return merged;
 }
 
-export function buildLevelCompletionPayload(
-  before: ProgressState,
-  completed: ProgressState,
-  synced: ProgressState,
-  levelId: string,
-): LevelRecord | null {
-  const completedRecord = completed.levels[levelId];
-  if (!completedRecord) return null;
-  const merged = mergeRecord(completedRecord, synced.levels[levelId]);
-  return {
-    ...merged,
-    attempts: Math.max(before.levels[levelId]?.attempts ?? 0, synced.levels[levelId]?.attempts ?? 0) + 1,
-  };
-}
-
-export function buildRandomRunCompletionPayload(
-  before: ProgressState,
-  completed: ProgressState,
-  synced: ProgressState,
-): { runs: number; bestTimeMs: number | null } {
-  return {
-    runs: Math.max(before.randomRun.runs, synced.randomRun.runs) + 1,
-    bestTimeMs: mergeRandomRun(completed.randomRun, synced.randomRun).bestTimeMs,
-  };
-}
-
-/** Pull server progress and merge over local. Never throws. */
+/** Pull server progress (levels + random-run) and merge over local. Never throws. */
 export async function syncFromServer(api: GameApiLike, local: ProgressState): Promise<ProgressState> {
   try {
     const merged = emptyProgress();
-    merged.randomRun = normalizeRandomRun(local.randomRun);
-    let remoteLevels: Record<string, Partial<LevelRecord>> | undefined;
+    merged.randomRun = local.randomRun;
+    let remoteLevels: Record<string, LevelRecord> | undefined;
     try {
-      const progressRes = await api.getGameProgress();
-      if (progressRes.success && progressRes.data?.levels) {
-        remoteLevels = progressRes.data.levels;
-      }
+      const res = await api.getGameProgress();
+      if (res.success && res.data?.levels) remoteLevels = res.data.levels;
     } catch {
       /* ignore */
     }
     try {
-      const randomRunRes = await api.getRandomRunStats();
-      if (randomRunRes.success && randomRunRes.data) {
-        merged.randomRun = mergeRandomRun(local.randomRun, {
-          runs: randomRunRes.data.runs,
-          bestTimeMs: randomRunRes.data.best_time_ms,
-        });
+      const rr = await api.getRandomRunStats();
+      if (rr.success && rr.data) {
+        merged.randomRun = mergeRandomRun(local.randomRun, { runs: rr.data.runs, bestTimeMs: rr.data.best_time_ms });
       }
     } catch {
       /* ignore */
@@ -218,7 +166,7 @@ export async function syncFromServer(api: GameApiLike, local: ProgressState): Pr
     }
     const ids = new Set([...Object.keys(local.levels), ...Object.keys(remoteLevels)]);
     for (const id of ids) {
-      merged.levels[id] = mergeRecord(local.levels[id], normalizeLevelRecord(remoteLevels[id]));
+      merged.levels[id] = mergeRecord(local.levels[id], remoteLevels[id]);
     }
     saveLocalProgress(merged);
     return merged;
@@ -235,19 +183,19 @@ export async function pushLevelResult(api: GameApiLike, levelId: string, rec: Le
       best_time_ms: rec.bestTimeMs,
       deaths: rec.deaths,
       shards: rec.shards,
-      attempts: rec.attempts,
     });
   } catch {
     /* offline: local copy already saved */
   }
 }
 
-export async function pushRandomRunResult(api: GameApiLike, randomRun: { runs: number; bestTimeMs: number | null }): Promise<void> {
+/** Write-through random-run stats. Never throws. */
+export async function pushRandomRunResult(
+  api: GameApiLike,
+  randomRun: { runs: number; bestTimeMs: number | null },
+): Promise<void> {
   try {
-    await api.putRandomRunStats({
-      runs: randomRun.runs,
-      best_time_ms: randomRun.bestTimeMs,
-    });
+    await api.putRandomRunStats({ runs: randomRun.runs, best_time_ms: randomRun.bestTimeMs });
   } catch {
     /* offline: local copy already saved */
   }
@@ -264,7 +212,6 @@ export function recordLevelResult(
     bestTimeMs: prev?.bestTimeMs == null ? result.timeMs : Math.min(prev.bestTimeMs, result.timeMs),
     deaths: Math.max(prev?.deaths ?? 0, result.deaths),
     shards: Math.max(prev?.shards ?? 0, result.shards),
-    attempts: (prev?.attempts ?? 0) + 1,
   };
   const next: ProgressState = {
     levels: { ...p.levels, [levelId]: merged },

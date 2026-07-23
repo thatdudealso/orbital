@@ -11,10 +11,18 @@ import type { Sfx } from '../engine/audio';
 import type { Materials } from './materials';
 import type { BiomeDef } from './biomes';
 
-export type PowerupType = 'boost' | 'shield' | 'magnet' | 'slow' | 'anchor';
+export type PowerupType =
+  | 'boost'
+  | 'shield'
+  | 'magnet'
+  | 'slow'
+  | 'anchor'
+  | 'phase'
+  | 'dash'
+  | 'echo';
 
 export interface ZoneEffect {
-  kind: 'drag' | 'wind' | 'gravity';
+  kind: 'drag' | 'wind' | 'gravity' | 'conveyor';
   value: number;
   dir?: THREE.Vector3;
 }
@@ -27,7 +35,8 @@ export type SensorData =
   | { type: 'goal' }
   | { type: 'zone'; zone: ZoneEffect }
   | { type: 'bounce'; power: number; forward?: THREE.Vector3 }
-  | { type: 'boostpad'; dir: THREE.Vector3; power: number };
+  | { type: 'boostpad'; dir: THREE.Vector3; power: number }
+  | { type: 'teleport'; exit: THREE.Vector3; heading: number };
 
 /** Collider handle -> gameplay meaning. */
 export class SensorRegistry {

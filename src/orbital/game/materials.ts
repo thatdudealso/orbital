@@ -61,6 +61,9 @@ export function buildMaterials(p: BiomePalette): Materials {
       magnet: emissive('#a78bfa', 2.4),
       slow: emissive('#f0abfc', 2.4),
       anchor: emissive('#4ade80', 2.4),
+      phase: emissive('#67e8f9', 2.6),
+      dash: emissive('#fb7185', 2.6),
+      echo: emissive('#c4b5fd', 2.5),
     },
   };
 }

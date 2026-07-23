@@ -20,8 +20,6 @@ import {
   pushLevelResult,
   pushRandomRunResult,
   loadLocalProgress,
-  buildLevelCompletionPayload,
-  buildRandomRunCompletionPayload,
   mergeProgress,
   syncFromServer,
   type ProgressState,
@@ -94,33 +92,33 @@ export default function OrbitalPlay() {
     });
     events.on('complete', ({ stats: s }) => {
       setStats(s);
-      const beforeCompletion = progressRef.current;
+      // persist: local first for instant feedback, then fetch-merge server state
+      // before pushing, so a completion never overwrites a better server record
+      // (fixed ahead of 5432wire prod - see save.ts).
       const completedProgress =
         s.mode === 'campaign'
-          ? recordLevelResult(beforeCompletion, s.levelId, {
+          ? recordLevelResult(progressRef.current, s.levelId, {
               timeMs: s.timeMs,
               deaths: s.deaths,
               shards: s.shards,
             })
-          : recordRandomRunResult(beforeCompletion, s.timeMs);
+          : recordRandomRunResult(progressRef.current, s.timeMs);
       progressRef.current = completedProgress;
 
       void progressReady.then((synced) => {
         if (cancelled) return;
-        progressRef.current = mergeProgress(progressRef.current, synced);
+        const merged = mergeProgress(completedProgress, synced);
+        progressRef.current = merged;
         if (s.mode === 'campaign') {
-          const rec = buildLevelCompletionPayload(beforeCompletion, completedProgress, synced, s.levelId);
-          if (rec) void pushLevelResult(api, s.levelId, rec);
+          void pushLevelResult(api, s.levelId, merged.levels[s.levelId]);
         } else {
-          void pushRandomRunResult(api, buildRandomRunCompletionPayload(beforeCompletion, completedProgress, synced));
+          void pushRandomRunResult(api, merged.randomRun);
         }
       });
     });
 
     const progressReady = syncFromServer(api, progressRef.current).then((next) => {
-      if (!cancelled) {
-        progressRef.current = mergeProgress(progressRef.current, next);
-      }
+      if (!cancelled) progressRef.current = mergeProgress(progressRef.current, next);
       return next;
     });
 
@@ -141,7 +139,7 @@ export default function OrbitalPlay() {
           biomeId,
           parTimeSec: level ? level.parTimeSec : run!.parTimeSec,
           tips: level ? level.tips : [`difficulty: ${run!.difficultyLabel}`, 'generated track - never the same twice'],
-          worldNumber: level ? `WORLD ${String(levelIndex + 1).padStart(2, '0')}/10` : 'RANDOM RUN',
+          worldNumber: level ? `WORLD ${String(levelIndex + 1).padStart(2, '0')}/20` : 'RANDOM RUN',
           modeLabel: mode === 'campaign' ? 'CAMPAIGN' : `${run!.difficultyLabel}`,
           levelIndex,
           levelId: level ? level.id : `random-${run!.seed}`,
@@ -231,9 +229,9 @@ export default function OrbitalPlay() {
       void input.enableTilt().then((ok) => {
         setMotionReady(ok);
         if (!ok) {
-          const fallback = { ...merged, control: 'edges' as const };
-          setSettings(fallback);
-          saveSettings(fallback);
+          const merged = { ...settings, control: 'edges' as const };
+          setSettings(merged);
+          saveSettings(merged);
           input.setMode('arrows');
         }
       });

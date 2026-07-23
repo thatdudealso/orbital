@@ -4,6 +4,7 @@
  */
 
 import * as THREE from 'three';
+import { RAPIER } from './physics';
 
 const easeInOutQuad = (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -20,6 +21,11 @@ export class CameraRig {
   private followYaw = 0;
   private initialized = false;
 
+  // camera obstruction: physics raycast pull-in
+  private world: RAPIER.World | null = null;
+  private excludeCollider: RAPIER.Collider | null = null;
+  private clearDist = 7.2;
+
   // path state
   private path: THREE.CatmullRomCurve3 | null = null;
   private pathT = 0;
@@ -35,6 +41,12 @@ export class CameraRig {
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
+  }
+
+  /** Attach the physics world so the follow cam never hides inside geometry. */
+  setWorld(world: RAPIER.World, excludeCollider: RAPIER.Collider): void {
+    this.world = world;
+    this.excludeCollider = excludeCollider;
   }
 
   getMode(): Mode {
@@ -75,6 +87,27 @@ export class CameraRig {
       .copy(ballPos)
       .addScaledVector(back, -7.2)
       .add(new THREE.Vector3(0, 4.0, 0));
+
+    // Obstruction handling: ray from the ball toward the desired camera
+    // spot; if track geometry or scenery blocks the line, pull the camera
+    // in front of the obstruction. Snaps in fast, eases back out slowly.
+    if (this.world) {
+      const toCam = desired.clone().sub(ballPos);
+      const dist = toCam.length();
+      const dir = toCam.clone().normalize();
+      const ray = new RAPIER.Ray(
+        { x: ballPos.x, y: ballPos.y, z: ballPos.z },
+        { x: dir.x, y: dir.y, z: dir.z },
+      );
+      const hit = this.world.castRay(ray, dist + 0.4, true, undefined, undefined, this.excludeCollider ?? undefined);
+      let maxDist = dist;
+      if (hit) {
+        maxDist = Math.max(2.6, hit.timeOfImpact - 0.4);
+      }
+      const k = maxDist < this.clearDist ? 0.55 : 0.055;
+      this.clearDist += (maxDist - this.clearDist) * k;
+      desired.copy(ballPos).addScaledVector(dir, Math.min(this.clearDist, dist));
+    }
 
     if (!this.initialized) {
       this.smoothPos.copy(desired);

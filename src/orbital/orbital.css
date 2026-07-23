@@ -120,6 +120,14 @@
 
 /* ------------------------------ level grid ------------------------------ */
 
+.orb-act-label {
+  color: var(--orb-dim);
+  font-size: 11px;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  margin: 0 0 12px;
+}
+
 .orb-level-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));

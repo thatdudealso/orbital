@@ -21,6 +21,12 @@ import {
   addPowerup,
   addCheckpointGate,
   addGoalGate,
+  addConveyor,
+  addGate,
+  addSeesaw,
+  addRingGate,
+  addCrusher,
+  addPortalPair,
 } from './obstacles';
 
 const staticGroups = collisionGroups(GROUP.STATIC, GROUP.BALL);
@@ -50,6 +56,12 @@ export type SegmentSpec =
   | { kind: 'boosts'; count: number; spacing?: number }
   | { kind: 'shards'; pattern: 'line' | 'arc' | 'ring'; over?: number }
   | { kind: 'powerup'; power: PowerupType }
+  | { kind: 'conveyor'; length: number; strength?: number }
+  | { kind: 'gates'; length: number; count: number; period?: number }
+  | { kind: 'seesaws'; count: number; spacing?: number; amp?: number; speed?: number }
+  | { kind: 'rings'; length: number; count: number; speed?: number }
+  | { kind: 'crushers'; length: number; count: number; period?: number }
+  | { kind: 'portal'; gap: number }
   | { kind: 'goal' };
 
 // ------------------------------------------------------------------ deck helper
@@ -446,6 +458,89 @@ export function buildSegment(ctx: BuildCtx, cursor: Cursor, spec: SegmentSpec): 
       const p = cursor.pos.clone();
       p.y += 1.6;
       addPowerup(ctx, p, spec.power);
+      break;
+    }
+    case 'conveyor': {
+      const start = cursor.pos.clone();
+      addDeck(ctx, cursor, spec.length, { width: 6, edge: false });
+      const center = start.clone().addScaledVector(cursor.dir(), spec.length / 2);
+      center.y += 0.12;
+      addConveyor(ctx, center, new THREE.Vector3(5.4, 0.18, spec.length * 0.92), cursor.heading, spec.strength ?? 18);
+      break;
+    }
+    case 'gates': {
+      const start = cursor.pos.clone();
+      addDeck(ctx, cursor, spec.length, { width: 7 });
+      const n = spec.count;
+      for (let i = 0; i < n; i++) {
+        const p = start.clone().addScaledVector(cursor.dir(), ((i + 1) * spec.length) / (n + 1));
+        p.y += 0.05;
+        addGate(ctx, p, 6.5, cursor.heading, {
+          period: spec.period ?? 2.6,
+          phase: i * 0.55,
+          opening: 1.5,
+        });
+      }
+      break;
+    }
+    case 'seesaws': {
+      const spacing = spec.spacing ?? 9;
+      for (let i = 0; i < spec.count; i++) {
+        const p = cursor.pos.clone().addScaledVector(cursor.dir(), spacing * (i + 0.5));
+        p.y -= 0.1;
+        addSeesaw(ctx, p, cursor.heading, {
+          length: 7.5,
+          width: 4.8,
+          amp: spec.amp ?? 0.32,
+          speed: spec.speed ?? 0.75,
+          phase: i * 1.1,
+        });
+        ctx.pathPoints.push(p.clone());
+      }
+      cursor.advance(spacing * spec.count);
+      addDeck(ctx, cursor, 4, {});
+      break;
+    }
+    case 'rings': {
+      const start = cursor.pos.clone();
+      addDeck(ctx, cursor, spec.length, { width: 5.5 });
+      const n = spec.count;
+      for (let i = 0; i < n; i++) {
+        const p = start.clone().addScaledVector(cursor.dir(), ((i + 1) * spec.length) / (n + 1));
+        p.y += 1.5;
+        addRingGate(ctx, p, cursor.heading, {
+          radius: 2.0,
+          speed: (spec.speed ?? 1.5) * (i % 2 === 0 ? 1 : -1),
+          phase: i * 0.9,
+        });
+      }
+      break;
+    }
+    case 'crushers': {
+      const start = cursor.pos.clone();
+      addDeck(ctx, cursor, spec.length, { width: 6.5 });
+      const n = spec.count;
+      for (let i = 0; i < n; i++) {
+        const p = start.clone().addScaledVector(cursor.dir(), ((i + 1) * spec.length) / (n + 1));
+        addCrusher(ctx, p, 5.5, cursor.heading, {
+          period: spec.period ?? 2.1,
+          phase: i * 0.6,
+          length: 2.8,
+        });
+      }
+      break;
+    }
+    case 'portal': {
+      // entry pad, void gap, exit pad - warp skips the void
+      addDeck(ctx, cursor, 5, { width: 6 });
+      const entry = cursor.pos.clone();
+      entry.y += 0.05;
+      cursor.advance(spec.gap);
+      ctx.pathPoints.push(cursor.pos.clone());
+      addDeck(ctx, cursor, 6, { width: 6 });
+      const exit = cursor.pos.clone().addScaledVector(cursor.dir(), -3);
+      exit.y += 0.05;
+      addPortalPair(ctx, entry, exit, cursor.heading);
       break;
     }
     case 'goal': {

@@ -29,6 +29,9 @@ const POWER_COLORS: Record<PowerupType, string> = {
   magnet: '#a78bfa',
   slow: '#f0abfc',
   anchor: '#4ade80',
+  phase: '#67e8f9',
+  dash: '#fb7185',
+  echo: '#c4b5fd',
 };
 
 export function Hud({

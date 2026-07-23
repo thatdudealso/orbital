@@ -186,6 +186,7 @@ export class Game {
     this.ball = new Ball(this.physics.world, this.track.startPos, this.biome.physics, this.biome.ballColor);
     scene.add(this.ball.mesh);
     this.respawnPos.copy(this.track.startPos);
+    this.rig.setWorld(this.physics.world, this.ball.collider);
 
     // input wiring
     this.input.attach();
@@ -338,8 +339,9 @@ export class Game {
     if (this.ball.position.y < this.track.killY) this.die('void');
     // powerup states for HUD
     this.events.emit('powerups', { active: this.ball.activePowers(this.simTime) });
-    // FOV kick while boosting
-    const targetFov = this.ball.isBoosting(this.simTime) ? 72 : 62;
+    // FOV kick while boosting / dashing
+    const targetFov =
+      this.ball.isDashOn(this.simTime) ? 78 : this.ball.isBoosting(this.simTime) ? 72 : 62;
     const cam = this.stage.camera;
     cam.fov += (targetFov - cam.fov) * Math.min(1, rawDt * 6);
     cam.updateProjectionMatrix();
@@ -426,6 +428,17 @@ export class Game {
       }
       case 'hazard': {
         if (this.simTime < this.ball.invulnerableUntil) break;
+        // PHASE: slip through lasers/crushers/lava without dying
+        if (this.ball.isPhaseOn(this.simTime)) {
+          this.particles.burst(this.ball.position, {
+            color: '#67e8f9',
+            count: 12,
+            speed: 3,
+            life: 0.35,
+            size: 0.35,
+          });
+          break;
+        }
         if (this.ball.consumeShield()) {
           this.sfx.hazard();
           this.ball.invulnerableUntil = this.simTime + 1;
@@ -465,6 +478,19 @@ export class Game {
         this.particles.burst(this.ball.position, { color: '#22d3ee', count: 22, speed: 6, life: 0.5, size: 0.5 });
         break;
       }
+      case 'teleport': {
+        const exit = data.exit;
+        this.ball.body.setTranslation({ x: exit.x, y: exit.y, z: exit.z }, true);
+        const speed = Math.max(6, Math.hypot(this.ball.velocity.x, this.ball.velocity.z) * 0.85);
+        const fx = -Math.sin(data.heading);
+        const fz = -Math.cos(data.heading);
+        this.ball.body.setLinvel({ x: fx * speed, y: 2.2, z: fz * speed }, true);
+        this.ball.invulnerableUntil = this.simTime + 0.45;
+        this.sfx.boost();
+        this.particles.burst(exit, { color: '#67e8f9', count: 36, speed: 7, life: 0.7, size: 0.55, up: 2 });
+        this.events.emit('toast', { text: 'WARP', tone: 'info' });
+        break;
+      }
     }
   }
 
@@ -478,13 +504,13 @@ export class Game {
   private applyZones(dt: number): void {
     let gravity: number | null = null;
     for (const zone of this.activeZones) {
-      if (zone.kind === 'wind' && zone.dir) {
+      if ((zone.kind === 'wind' || zone.kind === 'conveyor') && zone.dir) {
         const mass = this.ball.body.mass();
         this.ball.body.applyImpulse(
           { x: zone.dir.x * zone.value * mass * dt, y: 0, z: zone.dir.z * zone.value * mass * dt },
           true,
         );
-        if (Math.random() < 0.25) {
+        if (zone.kind === 'wind' && Math.random() < 0.25) {
           const p = this.ball.position.add(new THREE.Vector3((Math.random() - 0.5) * 3, Math.random() * 1.5, (Math.random() - 0.5) * 3));
           this.particles.puff(p, zone.dir.clone().multiplyScalar(6), this.biome.palette.accent, 0.35, 0.5);
         }
@@ -498,14 +524,18 @@ export class Game {
   }
 
   private tickMagnet(): void {
-    if (!this.ball.isMagnetOn(this.simTime)) return;
+    const magnet = this.ball.isMagnetOn(this.simTime);
+    const echo = this.ball.isEchoOn(this.simTime);
+    if (!magnet && !echo) return;
     const bp = this.ball.position;
+    const reach = echo ? 14 : 8;
+    const pull = echo ? 0.22 : 0.12;
     for (const shard of this.ctx.shards) {
       if (shard.collected) continue;
       const d = shard.mesh.position.distanceTo(bp);
-      if (d < 8) {
-        shard.mesh.position.lerp(bp, 0.12);
-        if (d < 1.1) this.collectShard(shard.id);
+      if (d < reach) {
+        shard.mesh.position.lerp(bp, pull);
+        if (d < (echo ? 1.6 : 1.1)) this.collectShard(shard.id);
       }
     }
   }
@@ -521,7 +551,16 @@ export class Game {
   }
 
   private powerColor(p: PowerupType): string {
-    return { boost: '#22d3ee', shield: '#fbbf24', magnet: '#a78bfa', slow: '#f0abfc', anchor: '#4ade80' }[p];
+    return {
+      boost: '#22d3ee',
+      shield: '#fbbf24',
+      magnet: '#a78bfa',
+      slow: '#f0abfc',
+      anchor: '#4ade80',
+      phase: '#67e8f9',
+      dash: '#fb7185',
+      echo: '#c4b5fd',
+    }[p];
   }
 
   // ---------------------------------------------------------------- death & victory
@@ -542,7 +581,14 @@ export class Game {
     });
     this.ball.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     this.events.emit('toast', {
-      text: kind === 'void' ? 'LOST TO THE VOID' : kind === 'lava' ? 'INCINERATED' : 'TERMINATED',
+      text:
+        kind === 'void'
+          ? 'LOST TO THE VOID'
+          : kind === 'lava'
+            ? 'INCINERATED'
+            : kind === 'crusher'
+              ? 'CRUSHED'
+              : 'TERMINATED',
       tone: 'bad',
     });
   }
