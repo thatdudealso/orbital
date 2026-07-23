@@ -18,7 +18,11 @@ import {
   recordLevelResult,
   recordRandomRunResult,
   pushLevelResult,
+  pushRandomRunResult,
   loadLocalProgress,
+  mergeProgress,
+  syncFromServer,
+  type ProgressState,
   type DeviceSettings,
 } from '../orbital/game/save';
 import type { Game, GameEvents, GameState, BriefingInfo, CompleteStats } from '../orbital/game/game';
@@ -47,6 +51,7 @@ export default function OrbitalPlay() {
   const gameRef = useRef<Game | null>(null);
   const eventsRef = useRef<Emitter<GameEvents> | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const progressRef = useRef<ProgressState>(loadLocalProgress());
   const [runId, setRunId] = useState(0);
   const [randomRun, setRandomRun] = useState<RandomRunSpec | null>(null);
 
@@ -87,18 +92,34 @@ export default function OrbitalPlay() {
     });
     events.on('complete', ({ stats: s }) => {
       setStats(s);
-      // persist: local first, then server
-      if (s.mode === 'campaign') {
-        const next = recordLevelResult(loadLocalProgress(), s.levelId, {
-          timeMs: s.timeMs,
-          deaths: s.deaths,
-          shards: s.shards,
-        });
-        const rec = next.levels[s.levelId];
-        void pushLevelResult(api, s.levelId, rec);
-      } else {
-        recordRandomRunResult(loadLocalProgress(), s.timeMs);
-      }
+      // persist: local first for instant feedback, then fetch-merge server state
+      // before pushing, so a completion never overwrites a better server record
+      // (fixed ahead of 5432wire prod - see save.ts).
+      const completedProgress =
+        s.mode === 'campaign'
+          ? recordLevelResult(progressRef.current, s.levelId, {
+              timeMs: s.timeMs,
+              deaths: s.deaths,
+              shards: s.shards,
+            })
+          : recordRandomRunResult(progressRef.current, s.timeMs);
+      progressRef.current = completedProgress;
+
+      void progressReady.then((synced) => {
+        if (cancelled) return;
+        const merged = mergeProgress(completedProgress, synced);
+        progressRef.current = merged;
+        if (s.mode === 'campaign') {
+          void pushLevelResult(api, s.levelId, merged.levels[s.levelId]);
+        } else {
+          void pushRandomRunResult(api, merged.randomRun);
+        }
+      });
+    });
+
+    const progressReady = syncFromServer(api, progressRef.current).then((next) => {
+      if (!cancelled) progressRef.current = mergeProgress(progressRef.current, next);
+      return next;
     });
 
     const run = mode === 'random' ? generateRandomRun(randomSeed()) : null;
