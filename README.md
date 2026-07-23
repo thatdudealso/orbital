@@ -78,7 +78,7 @@ Every world opens with a cinematic flythrough + terrain/gravity briefing, and en
 - **Power-ups** - BOOST, SHIELD, MAGNET, SLOW-MO, GRAV-ANCHOR (Act I), plus PHASE, DASH, ECHO (Act II) - placed before the obstacle that needs them.
 - **Shards** - optional collectibles on risky lines for bragging rights.
 - **RANDOM RUN** - endless login-only mode: a seeded generator stitches segment templates into a track at a random world with random difficulty. Never the same twice.
-- **Progression** - 20-level campaign (Act I + Act II) unlocks sequentially; per-level best times, deaths, and shards sync to your account and follow you across devices.
+- **Progression** - 20-level campaign (Act I + Act II) unlocks sequentially; per-level best times, deaths, and shards, plus random-run counts and best times, sync to your account and follow you across devices.
 
 ## Repo layout
 
